@@ -41,3 +41,11 @@ Accuracy: **71.33**%
     - 把變更推到遠程分支，然後可以在 line 群裡講一下
 4. 有空的人可以去 clone 該分支的代碼下來跑，確認成績沒有問題
 5. 確認該方案為當前最佳解之後，我會將分支代碼合到主幹去，回到步驟 2 繼續開發
+
+## 終端運行圖片供參考
+1. Baseline 運行中
+   ![image](https://github.com/user-attachments/assets/add5619e-167c-404b-9ef2-dc133e6302b4)
+ 
+2. 對答案輸出結果
+   ![image](https://github.com/user-attachments/assets/b57451f3-527e-4374-b5e8-0a92e21bdf77)
+
