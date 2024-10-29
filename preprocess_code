@@ -1,0 +1,40 @@
+import os
+import json
+import PyPDF2
+
+# Function to extract text from a PDF file
+def extract_text_from_pdf(pdf_path):
+    with open(pdf_path, 'rb') as pdf_file:
+        reader = PyPDF2.PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text()
+    return text
+
+# Function to convert all PDFs in a folder to JSON
+def convert_pdfs_to_json(pdf_folder, output_folder):
+    # Ensure the output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+    
+    for filename in os.listdir(pdf_folder):
+        if filename.endswith('.pdf'):
+            pdf_path = os.path.join(pdf_folder, filename)
+            print(f"Processing: {pdf_path}")
+            
+            # Extract text from the PDF
+            pdf_text = extract_text_from_pdf(pdf_path)
+            
+            # Save the extracted text to a JSON file
+            json_filename = os.path.splitext(filename)[0] + '.json'
+            json_path = os.path.join(output_folder, json_filename)
+            
+            with open(json_path, 'w', encoding='utf-8') as json_file:
+                json.dump({"filename": filename, "content": pdf_text}, json_file, ensure_ascii=False, indent=4)
+            
+            print(f"Saved JSON: {json_path}")
+
+# Example usage
+pdf_folder = '/Users/maggielin/Documents/python/fintech/AIcup/競賽資料集/reference/insurance'  # Replace with the actual folder containing your PDFs
+output_folder = '/Users/maggielin/Documents/python/fintech/AIcup/競賽資料集/reference/insurance/preprocess/insurance'  # Replace with the folder to save the JSON files
+
+convert_pdfs_to_json(pdf_folder, output_folder)
