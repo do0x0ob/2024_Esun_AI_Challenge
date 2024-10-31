@@ -1,6 +1,7 @@
 # venv
 venv/
 env/
+myenv/
 .venv/
 .env/
 
@@ -12,6 +13,7 @@ __pycache__/
 
 # output_answers.json
 output_answers.json
+parameter_search_results.json
 
 # Others
 .DS_Store

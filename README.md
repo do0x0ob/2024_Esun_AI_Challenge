@@ -7,6 +7,8 @@ Total questions: **150**
 
 Accuracy: **71.33**%
 
+## bm25_tuner 運行
+```python bm25_tuner.py --data_dir /Users/harperdelaviga/競賽資料集```
 
 ## 首次運行流程
 1. 將 repo 裡的 main branch clone 到本機 
