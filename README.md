@@ -1,4 +1,16 @@
 ## 當前最佳成績
+
+### 20241031  
+BM25 還有多組參數都可以達到一樣的準確率，單純調參數效果不明顯。需要另闢途徑提高。  
+目前 bm25_retrieve.py 設定參數為 (k1 = 1.5, b = 0.5)  
+Branch: harper/feature/bm25_tuner
+
+Correct answers: **110**  
+Total questions: **150**    
+Accuracy: **73.33%**
+
+---
+
 **這是 Baseline 代碼跑出來的結果，我們需要至少超越它：**
 
 Correct answers: **107** 
