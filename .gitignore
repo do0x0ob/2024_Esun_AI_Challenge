@@ -18,3 +18,8 @@ parameter_search_results.json
 # Others
 .DS_Store
 *.log
+
+# jupyter notebook
+*.ipynb
+.ipynb_checkpoints/
+data_converter.py

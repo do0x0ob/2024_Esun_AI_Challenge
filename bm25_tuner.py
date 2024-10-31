@@ -97,8 +97,9 @@ class BM25Tuner:
         for doc_id, content in self.key_to_source_dict.items():
             self.tokenized_corpus['faq'][doc_id] = list(jieba.cut_for_search(str(content)))
 
+    """
     def load_pdf_data(self, source_path):
-            """Load PDF documents from source directory"""
+            # Load PDF documents from source directory
             try:
                 masked_file_ls = os.listdir(source_path)
                 corpus_dict = {
@@ -108,6 +109,30 @@ class BM25Tuner:
                 return corpus_dict
             except Exception as e:
                 raise Exception(f"Error loading PDF files from {source_path}: {str(e)}")
+    """
+
+    def load_pdf_data(self, source_path):
+        """Load PDF documents from source directory"""
+        try:
+            masked_file_ls = os.listdir(source_path)
+            corpus_dict = {
+                int(file.replace('.pdf', '')): self.read_pdf(os.path.join(source_path, file)) 
+                for file in tqdm(masked_file_ls, desc=f"Loading {os.path.basename(source_path)} PDFs")
+            }
+            
+            # 格式查看
+            print("\n=== Corpus Dict 格式示例 ===")
+            print(f"總文件數: {len(corpus_dict)}")
+            print(f"文件 ID 列表 (前5個): {list(corpus_dict.keys())[:5]}")
+            first_key = list(corpus_dict.keys())[0]
+            print(f"\n文件 {first_key} 內容預覽 (前200字):")
+            print(corpus_dict[first_key][:200])
+            print("=========================\n")
+            
+            return corpus_dict
+        except Exception as e:
+            raise Exception(f"Error loading PDF files from {source_path}: {str(e)}")
+
 
     def read_pdf(self, pdf_loc, page_infos: list = None):
         """Extract text from PDF file"""

@@ -40,7 +40,7 @@ def BM25_retrieve(qs, source, corpus_dict):
     # [TODO] 可自行替換其他檢索方式，以提升效能
 
     tokenized_corpus = [list(jieba.cut_for_search(doc)) for doc in filtered_corpus]  # 將每篇文檔進行分詞
-    bm25 = BM25Okapi(tokenized_corpus)  # 使用BM25演算法建立檢索模型
+    bm25 = BM25Okapi(tokenized_corpus, b=0.5)  # 使用BM25演算法建立檢索模型
     tokenized_query = list(jieba.cut_for_search(qs))  # 將查詢語句進行分詞
     ans = bm25.get_top_n(tokenized_query, list(filtered_corpus), n=1)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
     a = ans[0]
