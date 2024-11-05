@@ -82,6 +82,7 @@ Android System WebView 5
 書面同意 15
 約定方式 15
 變更 10
+應經由 20
 
 
 # QID 40

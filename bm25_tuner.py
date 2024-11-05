@@ -114,8 +114,9 @@ class BM25Tuner:
 
         return ' '.join(expanded_words)
 
+    """
     def init_jieba(self):
-        """初始化 jieba 分詞器，載入自定義字典"""
+        #初始化 jieba 分詞器，載入自定義字典
         try:
             dict_path = 'custom_dict.txt'
             if not os.path.exists(dict_path):
@@ -126,7 +127,29 @@ class BM25Tuner:
         except Exception as e:
             print(f"Error loading custom dictionary: {str(e)}")
             print("Continuing with default dictionary...")
-
+    """
+    def init_jieba(self):
+        """初始化 jieba 分詞器"""
+        try:
+            dict_path = 'custom_dict.txt'
+            if not os.path.exists(dict_path):
+                raise FileNotFoundError(f"Custom dictionary not found at: {dict_path}")
+            
+            # 載入前先觀察詞典內容
+            print("Loading custom dictionary...")
+            with open(dict_path, 'r', encoding='utf-8') as f:
+                print(f.read())
+                
+            jieba.load_userdict(dict_path)
+            print("Custom dictionary loaded successfully!")
+            
+            # 測試是否真的載入成功
+            test_text = "契約內容變更應經雙方同意並批註"
+            print("Test segmentation:", list(jieba.cut(test_text)))
+            
+        except Exception as e:
+            print(f"Error loading custom dictionary: {str(e)}")
+            print("Continuing with default dictionary...")
 
     def load_json_data(self):
             """載入所有必要的 JSON 資料"""
