@@ -3,9 +3,6 @@ import os
 import json
 
 def convert_pdfs_to_text(input_dir, output_dir, progress_file='conversion_progress.json'):
-    """
-    Convert PDFs to text with progress tracking
-    """
     try:
         # Create output directory if needed
         if not os.path.exists(output_dir):
@@ -28,24 +25,31 @@ def convert_pdfs_to_text(input_dir, output_dir, progress_file='conversion_progre
         # Process files
         total = len(pdf_files)
         for index, pdf_file in enumerate(pdf_files, 1):
-            # Skip if already processed
             if pdf_file in processed_files:
                 print(f"Skipping {pdf_file} (already processed)")
                 continue
 
+            print(f"Converting {pdf_file} ({index}/{total})...")
+            
             pdf_path = os.path.join(input_dir, pdf_file)
             txt_file = os.path.splitext(pdf_file)[0] + '.txt'
             txt_path = os.path.join(output_dir, txt_file)
-            
-            print(f"Converting {pdf_file} ({index}/{total})...")
-            
+
             # Convert PDF
             pdf_doc = PdfDocument()
             pdf_doc.LoadFromFile(pdf_path)
             
             text = ""
-            for i in range(pdf_doc.Pages.Count):
-                text += pdf_doc.Pages[i].ExtractText()
+            # 修正：使用正確的方法名稱
+            for page in pdf_doc.Pages:
+                # 嘗試不同可能的方法名
+                try:
+                    text += page.ExtractAllText()  # 試試這個方法
+                except AttributeError:
+                    try:
+                        text += page.ExtractTextFromPage()  # 或這個
+                    except AttributeError:
+                        text += page.GetText()  # 或這個
             
             # Save text
             with open(txt_path, 'w', encoding='utf-8') as f:
@@ -64,7 +68,6 @@ def convert_pdfs_to_text(input_dir, output_dir, progress_file='conversion_progre
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
-        # Progress is saved even if error occurs
         raise
 
 if __name__ == "__main__":
