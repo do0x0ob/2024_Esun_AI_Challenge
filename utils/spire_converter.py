@@ -1,30 +1,40 @@
 from spire.pdf import PdfDocument
+import os
 
 def convert_pdf_to_text(pdf_path, output_path):
     try:
-        # 載入 PDF 文件
+        # make sure target dir exsists
+        output_dir = os.path.dirname(output_path)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        # use absolute path
+        abs_pdf_path = os.path.abspath(pdf_path)
+        if not os.path.exists(abs_pdf_path):
+            raise FileNotFoundError(f"PDF file not found: {abs_pdf_path}")
+
         pdf_doc = PdfDocument()
-        pdf_doc.load_from_file(pdf_path)
+        pdf_doc.LoadFromFile(str(abs_pdf_path))
         
-        # 提取文字
         text = ""
-        for page in range(pdf_doc.pages.count):
-            text += pdf_doc.pages[page].extract_text()
+        for i in range(pdf_doc.Pages.Count):
+            text += pdf_doc.Pages[i].ExtractText()
         
-        # 將文字寫入 .txt 檔案
         with open(output_path, 'w', encoding='utf-8') as file:
             file.write(text)
         
-        print(f"Successfully converted {pdf_path} to {output_path}")
+        print(f"Successfully converted {abs_pdf_path} to {output_path}")
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An error occurred: {str(e)}")
+        raise
 
     finally:
-        pdf_doc.close()
+        if 'pdf_doc' in locals():
+            pdf_doc.Dispose()
 
-# 使用範例
-pdf_path = "競賽資料集/reference/finance/1022.pdf"
-output_path = "/opt/fintech_project/spire_output/1022.txt"
-
-convert_pdf_to_text(pdf_path, output_path)
+if __name__ == "__main__":
+    base_dir = "/opt/fintech_project"
+    pdf_path = os.path.join(base_dir, "競賽資料集/reference/finance/1022.pdf")
+    output_path = os.path.join(base_dir, "spire_output/1022.txt")
+    convert_pdf_to_text(pdf_path, output_path)
