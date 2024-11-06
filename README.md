@@ -4,7 +4,7 @@ Accuracy = 72%
 
 ## How to Use
 
-1. **bm25_tuner 運行**:  
+1. **bm25_tuner 運行(for Mac)**:  
 
     ```
     python bm25_tuner.py \
@@ -29,3 +29,5 @@ Accuracy = 72%
     ```
     python answer_checker.py --data_dir /Users/harperdelaviga/競賽資料集
     ```
+
+4. utils/spire_converter
