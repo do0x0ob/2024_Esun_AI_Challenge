@@ -7,7 +7,12 @@ Accuracy = 72%
 1. **bm25_tuner 運行**:  
 
     ```
-    python bm25_tuner.py --data_dir /Users/harperdelaviga/競賽資料集
+    python bm25_tuner.py \
+    --data_dir path/to/data \
+    --config config.json \
+    --dataset_json_path path/to/ocr_json \
+    --use_custom_dict
+    --use_synonyms
     ```
 
 2. **Run bm25_retrieve**  
