@@ -1,6 +1,6 @@
 ## Performance
-Accuracy for extra questions = **64.00%**
-Accuracy for official example questions = **80.67%**
+- Accuracy for extra questions = **64.00%**  
+- Accuracy for official example questions = **80.67%**
 
 ## todo
 
