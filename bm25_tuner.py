@@ -49,31 +49,20 @@ class BM25Tuner:
 
         return synonyms
 
+    
     def load_synonyms(self):
         """載入所有同義詞文件"""
         if not self.synonyms_dir:
             print("No synonyms directory specified, using default 'synonyms' directory")
-            self.synonyms_dir = os.path.join(os.path.dirname(__file__), 'synonyms')
+            self.synonyms_dir = os.path.dirname(__file__)  # Change this if necessary
+
+        synonym_file_path = os.path.join(self.synonyms_dir, 'synonym_dict.txt')
+        if os.path.exists(synonym_file_path):
+            self.synonyms = self.read_synonyms_from_file(synonym_file_path)
+            print(f"Loaded synonyms from {synonym_file_path}")
+        else:
+            print(f"Warning: Synonym file not found at {synonym_file_path}")
         
-        try:
-            categories = ['insurance', 'finance', 'faq']
-            for category in categories:
-                synonym_file = f'{category}_synonyms.txt'
-                file_path = os.path.join(self.synonyms_dir, synonym_file)
-                
-                if os.path.exists(file_path):
-                    self.synonyms[category] = self._load_synonym_file(file_path)
-                    print(f"Loaded synonyms for {category} from {file_path}")
-                else:
-                    print(f"Warning: Synonyms file not found for {category} at {file_path}")
-            
-            if not self.synonyms:
-                print("No synonym files were loaded successfully")
-            else:
-                print(f"Successfully loaded synonyms for categories: {list(self.synonyms.keys())}")
-                
-        except Exception as e:
-            print(f"Error loading synonyms: {e}")
 
     def _load_synonym_file(self, file_path):
         """從單個文件載入同義詞典"""
@@ -91,16 +80,17 @@ class BM25Tuner:
         except Exception as e:
             print(f"Error loading {file_path}: {e}")
         return synonyms
-
-    def expand_query(self, query, category):
-        """擴展查詢字串，加入同義詞"""
+    
+    def expand_query_with_weight(self, query, category):
+        """擴展查詢字串，加入同義詞並賦予權重"""
         if not self.synonyms or category not in self.synonyms:
-            return query
+            return query, {}
 
         words = list(jieba.cut_for_search(query))
         expanded_words = []
+        weight_dict = {}
         used_synonyms = set()
-
+        
         i = 0
         while i < len(words):
             # 先嘗試匹配較長的詞組
@@ -109,98 +99,50 @@ class BM25Tuner:
                 phrase = ''.join(words[i:i+j])
                 if phrase in self.synonyms[category]:
                     if phrase not in used_synonyms:
+                        # 獲取詞組資訊
+                        phrase_data = self.synonyms[category][phrase]
+                        weight = phrase_data["weight"]
+                        
+                        # 添加原詞組
                         expanded_words.append(phrase)
-                        for syn in self.synonyms[category][phrase]:
+                        weight_dict[phrase] = weight
+                        used_synonyms.add(phrase)
+                        
+                        # 添加同義詞
+                        for syn in phrase_data["synonyms"]:
                             if syn not in used_synonyms:
                                 expanded_words.append(syn)
+                                weight_dict[syn] = weight
                                 used_synonyms.add(syn)
-                        used_synonyms.add(phrase)
+                                
                     i += j
                     found_phrase = True
                     break
             
+            # 如果沒找到詞組，處理單個詞
             if not found_phrase:
                 word = words[i]
                 if word not in used_synonyms:
                     expanded_words.append(word)
+                    
+                    # 檢查是否有同義詞
                     if word in self.synonyms[category]:
-                        for syn in self.synonyms[category][word]:
-                            if syn not in used_synonyms:
-                                expanded_words.append(syn)
-                                used_synonyms.add(syn)
-                    used_synonyms.add(word)
-                i += 1
-
-        return ' '.join(expanded_words)
-    
-    def expand_query_with_weight(self, query, category, weight_dict=None):
-        """ 擴展查詢字串，加入同義詞並賦予權重 """
-
-        print(f"Input query: {query}")
-        print(f"Category: {category}")
-        print(f"Initial synonyms structure: {self.synonyms}")
-        
-        if not self.synonyms or category not in self.synonyms:
-            print(f"No synonyms found for category: {category}")
-            return query, weight_dict
-
-        #if not self.synonyms or category not in self.synonyms:
-        #    return query, weight_dict  # 確保返回的是字串和字典
-
-        words = list(jieba.cut_for_search(query))
-        expanded_words = []
-        used_synonyms = set()
-
-        if weight_dict is None:
-            weight_dict = {}
-
-        i = 0
-        while i < len(words):
-            found_phrase = False
-            for j in range(min(3, len(words) - i), 0, -1):
-                phrase = ''.join(words[i:i+j])
-                # 確保詞語或短語在字典中
-                if phrase in self.synonyms[category]:
-                    print(f"Found phrase: {phrase}")  # 打印找到的短語
-                    if phrase not in used_synonyms:
-                        phrase_data = self.synonyms[category][phrase]
-                        weight = phrase_data.get("weight", 1)
-                        expanded_words.append(phrase)
-                        weight_dict[phrase] = weight  # 使用該權重
-
-                        # 擴展同義詞並給予相同的權重
-                        for syn in phrase_data["synonyms"]:
-                            if syn not in used_synonyms:
-                                expanded_words.append(syn)
-                                weight_dict[syn] = weight  # 使用該權重
-                                used_synonyms.add(syn)
-                        used_synonyms.add(phrase)
-                    i += j
-                    found_phrase = True
-                    break
-            if not found_phrase:
-                word = words[i]
-                if word not in used_synonyms:
-                    expanded_words.append(word)
-                    # 從同義詞字典中提取權重
-                    if word in self.synonyms[category]:
-                        print(f"Found word: {word}")  # 打印找到的詞
                         word_data = self.synonyms[category][word]
-                        weight = word_data.get("weight", 1)
-                        weight_dict[word] = weight  # 使用該權重
-
-                        # 擴展同義詞並給予相同的權重
+                        weight = word_data["weight"]
+                        weight_dict[word] = weight
+                        
+                        # 添加同義詞
                         for syn in word_data["synonyms"]:
                             if syn not in used_synonyms:
                                 expanded_words.append(syn)
-                                weight_dict[syn] = weight  # 使用該權重
+                                weight_dict[syn] = weight
                                 used_synonyms.add(syn)
+                                
                     used_synonyms.add(word)
                 i += 1
 
-        print(f"Final weight_dict: {weight_dict}")
-        return ' '.join(expanded_words), weight_dict
-
+        expanded_query = ' '.join(expanded_words)
+        return expanded_query, weight_dict
 
     def init_jieba(self):
         """初始化 jieba 分詞器"""
@@ -330,12 +272,14 @@ class BM25Tuner:
     
     def BM25_retrieve_with_weight(self, qs, source, category, k1=1.5, b=0.75, n=1):
         """使用加權 BM25 算法檢索文檔"""
+        # 獲取擴展查詢和權重
         expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
-
-        # FIXME: test only
-        # print(f"Expanded query after expand_query_with_weight: {expanded_query}")
-        # print(f"Weight dict: {weight_dict}")
         
+        print(f"Debug - Original query: {qs}")
+        print(f"Debug - Expanded query: {expanded_query}")
+        print(f"Debug - Weight dictionary: {weight_dict}")
+
+        # 根據類別選擇相應的語料庫
         if category == 'finance':
             tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
             filtered_corpus = [self.corpus_dict_finance[int(file)] for file in source]
@@ -346,27 +290,48 @@ class BM25Tuner:
             tokenized_docs = [self.tokenized_corpus['faq'][int(file)] for file in source]
             filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
 
+        # 創建 BM25 實例
         bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
-        query_tokens = list(jieba.cut_for_search(expanded_query))
         
-        # 計算加權分數
-        doc_scores = bm25.get_scores(query_tokens)
+        # 對查詢進行分詞
+        query_tokens = list(jieba.cut_for_search(expanded_query))
+        print(f"Debug - Query tokens: {query_tokens}")
+        
+        # 獲取基礎 BM25 分數
+        base_scores = bm25.get_scores(query_tokens)
         
         # 應用權重
         weighted_scores = []
-        for i, score in enumerate(doc_scores):
-            weighted_score = score
+        for doc_idx, base_score in enumerate(base_scores):
+            # 初始化加權分數為基礎分數
+            weighted_score = base_score
+            
+            # 計算文檔中包含的查詢詞的權重總和
+            doc_tokens = tokenized_docs[doc_idx]
+            weight_sum = 0
+            token_count = 0
+            
             for token in query_tokens:
-                if token in weight_dict:
-                    weighted_score *= weight_dict[token]
+                if token in doc_tokens and token in weight_dict:
+                    weight_sum += weight_dict[token]
+                    token_count += 1
+            
+            # 如果文檔包含帶權重的詞，計算加權平均
+            if token_count > 0:
+                avg_weight = weight_sum / token_count
+                weighted_score *= avg_weight
+                
             weighted_scores.append(weighted_score)
-        
-        best_idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:n]
+            
+            print(f"Debug - Doc {doc_idx} - Base score: {base_score}, Weighted score: {weighted_score}")
 
-        # Match with original text
+        # 選擇最佳文檔
+        best_idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:n]
+        
+        # 獲取最佳文檔
         best_doc = filtered_corpus[best_idx[0]]
         
-        # Return corresponding file ID
+        # 返回對應的文件 ID
         if category == 'finance':
             res = [key for key, value in self.corpus_dict_finance.items() if value == best_doc]
         elif category == 'insurance':
@@ -374,6 +339,7 @@ class BM25Tuner:
         else:  # faq
             res = [key for key, value in self.key_to_source_dict.items() if str(value) == best_doc]
         
+        print(f"Debug - Selected document ID: {res[0]}")
         return res[0]
 
 
