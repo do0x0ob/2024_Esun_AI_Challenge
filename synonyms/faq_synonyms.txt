@@ -5,7 +5,7 @@
         "內容": {"synonyms": ["資訊", "信息"], "weight": 1},
         "查詢": {"synonyms": ["搜尋", "尋找"], "weight": 1},
         "重新發卡": {"synonyms": ["補換發"], "weight": 1},
-        "貸款額度": {"synonyms": ["核貸額度", "可貸額度"], "weight": 1},
+        "貸款額度": {"synonyms": ["核貸額度", "可貸額度"], "weight": 1.5},
         "薪水": {"synonyms": ["工作報酬"], "weight": 1},
         "刷臉ID": {"synonyms": [], "weight": 1},
         "哪些步驟": {"synonyms": [], "weight": 1}
