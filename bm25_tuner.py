@@ -30,6 +30,25 @@ class BM25Tuner:
         self.load_json_data()
         print("Data loading completed!")
 
+    def read_synonyms_from_file(self, file_path):
+        """Reads synonym data from a file and returns it in a structured dictionary."""
+        synonyms = {}
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith('#'):
+                        continue
+                    words = line.split()
+                    if len(words) > 1:
+                        key_word = words[0]
+                        synonyms[key_word] = words[1:]
+        except Exception as e:
+            print(f"Error loading {file_path}: {e}")
+
+        return synonyms
+
     def load_synonyms(self):
         """載入所有同義詞文件"""
         if not self.synonyms_dir:
@@ -113,21 +132,63 @@ class BM25Tuner:
                 i += 1
 
         return ' '.join(expanded_words)
+    
+    def expand_query_with_weight(self, query, category, weight_dict=None):
+        """ 擴展查詢字串，加入同義詞並賦予權重 """
+        if not self.synonyms or category not in self.synonyms:
+            return query, weight_dict
 
-    """
-    def init_jieba(self):
-        #初始化 jieba 分詞器，載入自定義字典
-        try:
-            dict_path = 'custom_dict.txt'
-            if not os.path.exists(dict_path):
-                raise FileNotFoundError(f"Custom dictionary not found at: {dict_path}")
-            
-            jieba.load_userdict(dict_path)
-            print("Custom dictionary loaded successfully!")
-        except Exception as e:
-            print(f"Error loading custom dictionary: {str(e)}")
-            print("Continuing with default dictionary...")
-    """
+        words = list(jieba.cut_for_search(query))
+        expanded_words = []
+        used_synonyms = set()
+        
+        if weight_dict is None:
+            weight_dict = {}
+
+        i = 0
+        while i < len(words):
+            found_phrase = False
+            for j in range(min(3, len(words) - i), 0, -1):
+                phrase = ''.join(words[i:i+j])
+                if phrase in self.synonyms[category]:
+                    if phrase not in used_synonyms:
+                        # 從同義詞字典中提取權重，確保是字典結構
+                        phrase_data = self.synonyms[category][phrase]
+                        weight = phrase_data.get("weight", 1)
+                        expanded_words.append(phrase)
+                        weight_dict[phrase] = weight  # 使用該權重
+                        
+                        # 擴展同義詞並給予相同的權重
+                        for syn in phrase_data["synonyms"]:
+                            if syn not in used_synonyms:
+                                expanded_words.append(syn)
+                                weight_dict[syn] = weight  # 使用該權重
+                                used_synonyms.add(syn)
+                        used_synonyms.add(phrase)
+                    i += j
+                    found_phrase = True
+                    break
+            if not found_phrase:
+                word = words[i]
+                if word not in used_synonyms:
+                    expanded_words.append(word)
+                    # 從同義詞字典中提取權重
+                    if word in self.synonyms[category]:
+                        word_data = self.synonyms[category][word]
+                        weight = word_data.get("weight", 1)
+                        weight_dict[word] = weight  # 使用該權重
+                    
+                        # 擴展同義詞並給予相同的權重
+                        for syn in word_data["synonyms"]:
+                            if syn not in used_synonyms:
+                                expanded_words.append(syn)
+                                weight_dict[syn] = weight  # 使用該權重
+                                used_synonyms.add(syn)
+                    used_synonyms.add(word)
+                i += 1
+
+        return ' '.join(expanded_words), weight_dict
+
 
     def init_jieba(self):
         """初始化 jieba 分詞器"""
@@ -251,6 +312,51 @@ class BM25Tuner:
             res = [key for key, value in self.key_to_source_dict.items() if str(value) == best_doc]
         
         return res[0]
+    
+    def BM25_retrieve_with_weight(self, qs, source, category, k1=1.5, b=0.75, n=1):
+        """使用加權 BM25 算法檢索文檔"""
+        expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
+        
+        if category == 'finance':
+            tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
+            filtered_corpus = [self.corpus_dict_finance[int(file)] for file in source]
+        elif category == 'insurance':
+            tokenized_docs = [self.tokenized_corpus['insurance'][int(file)] for file in source]
+            filtered_corpus = [self.corpus_dict_insurance[int(file)] for file in source]
+        else:  # faq
+            tokenized_docs = [self.tokenized_corpus['faq'][int(file)] for file in source]
+            filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
+
+        bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
+        query_tokens = list(jieba.cut_for_search(expanded_query))
+        
+        # 計算加權分數
+        doc_scores = bm25.get_scores(query_tokens)
+        
+        # 應用權重
+        weighted_scores = []
+        for i, score in enumerate(doc_scores):
+            weighted_score = score
+            for token in query_tokens:
+                if token in weight_dict:
+                    weighted_score *= weight_dict[token]
+            weighted_scores.append(weighted_score)
+        
+        best_idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:n]
+
+        # Match with original text
+        best_doc = filtered_corpus[best_idx[0]]
+        
+        # Return corresponding file ID
+        if category == 'finance':
+            res = [key for key, value in self.corpus_dict_finance.items() if value == best_doc]
+        elif category == 'insurance':
+            res = [key for key, value in self.corpus_dict_insurance.items() if value == best_doc]
+        else:  # faq
+            res = [key for key, value in self.key_to_source_dict.items() if str(value) == best_doc]
+        
+        return res[0]
+
 
     def evaluate_parameters(self, params):
         """Evaluate performance for given parameter set"""
