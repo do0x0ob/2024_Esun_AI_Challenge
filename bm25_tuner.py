@@ -1,4 +1,5 @@
 import os
+import datetime
 import json
 import argparse
 from tqdm import tqdm
@@ -31,32 +32,25 @@ class BM25Tuner:
         print("Data loading completed!")
 
     def read_synonyms_from_file(self, file_path):
-        """Reads synonym data from a file and returns it in a structured dictionary."""
-        synonyms = {}
-        
+        """讀取同義詞字典文件"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith('#'):
-                        continue
-                    words = line.split()
-                    if len(words) > 1:
-                        key_word = words[0]
-                        synonyms[key_word] = words[1:]
+                synonyms = json.load(f)
+                print(f"Loaded synonym dictionary: {json.dumps(synonyms, ensure_ascii=False, indent=2)}")
+                return synonyms
         except Exception as e:
-            print(f"Error loading {file_path}: {e}")
-
-        return synonyms
+            print(f"Error loading synonyms from {file_path}: {e}")
+            return {}
 
     
     def load_synonyms(self):
-        """載入所有同義詞文件"""
+        """載入同義詞字典"""
         if not self.synonyms_dir:
             print("No synonyms directory specified, using default 'synonyms' directory")
-            self.synonyms_dir = os.path.dirname(__file__)  # Change this if necessary
+            self.synonyms_dir = os.path.dirname(__file__)
 
-        synonym_file_path = os.path.join(self.synonyms_dir, 'synonym_dict.txt')
+        # 更改為讀取 JSON 格式的同義詞字典
+        synonym_file_path = os.path.join(self.synonyms_dir, 'synonym_dict.json')
         if os.path.exists(synonym_file_path):
             self.synonyms = self.read_synonyms_from_file(synonym_file_path)
             print(f"Loaded synonyms from {synonym_file_path}")
@@ -272,76 +266,112 @@ class BM25Tuner:
     
     def BM25_retrieve_with_weight(self, qs, source, category, k1=1.5, b=0.75, n=1):
         """使用加權 BM25 算法檢索文檔"""
-        # 獲取擴展查詢和權重
-        expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
-        
-        print(f"Debug - Original query: {qs}")
-        print(f"Debug - Expanded query: {expanded_query}")
-        print(f"Debug - Weight dictionary: {weight_dict}")
-
-        # 根據類別選擇相應的語料庫
-        if category == 'finance':
-            tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
-            filtered_corpus = [self.corpus_dict_finance[int(file)] for file in source]
-        elif category == 'insurance':
-            tokenized_docs = [self.tokenized_corpus['insurance'][int(file)] for file in source]
-            filtered_corpus = [self.corpus_dict_insurance[int(file)] for file in source]
-        else:  # faq
-            tokenized_docs = [self.tokenized_corpus['faq'][int(file)] for file in source]
-            filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
-
-        # 創建 BM25 實例
-        bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
-        
-        # 對查詢進行分詞
-        query_tokens = list(jieba.cut_for_search(expanded_query))
-        print(f"Debug - Query tokens: {query_tokens}")
-        
-        # 獲取基礎 BM25 分數
-        base_scores = bm25.get_scores(query_tokens)
-        
-        # 應用權重
-        weighted_scores = []
-        for doc_idx, base_score in enumerate(base_scores):
-            # 初始化加權分數為基礎分數
-            weighted_score = base_score
+        log_filename = "bm25_debug.log"
+        with open(log_filename, 'a', encoding='utf-8') as log_file:
+            log_file.write("\n" + "="*50 + "\n")
+            log_file.write(f"Timestamp: {datetime.datetime.now()}\n\n")
             
-            # 計算文檔中包含的查詢詞的權重總和
-            doc_tokens = tokenized_docs[doc_idx]
-            weight_sum = 0
-            token_count = 0
+            # 獲取擴展查詢和權重
+            expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
             
+            log_file.write(f"Original query: {qs}\n")
+            log_file.write(f"Category: {category}\n")
+            log_file.write(f"Expanded query: {expanded_query}\n")
+            log_file.write(f"Weight dictionary: {json.dumps(weight_dict, ensure_ascii=False, indent=2)}\n\n")
+
+            # 選擇相應的語料庫
+            if category == 'finance':
+                tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
+                filtered_corpus = [self.corpus_dict_finance[int(file)] for file in source]
+            elif category == 'insurance':
+                tokenized_docs = [self.tokenized_corpus['insurance'][int(file)] for file in source]
+                filtered_corpus = [self.corpus_dict_insurance[int(file)] for file in source]
+            else:  # faq
+                tokenized_docs = [self.tokenized_corpus['faq'][int(file)] for file in source]
+                filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
+
+            # 創建 BM25 實例
+            bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
+            
+            # 對查詢進行分詞並應用權重
+            query_tokens = list(jieba.cut_for_search(expanded_query))
+            
+            # 記錄查詢詞和權重
+            log_file.write("Query Analysis:\n")
+            log_file.write(f"Query tokens: {query_tokens}\n")
+            
+            # 創建加權查詢向量
+            weighted_query = []
+            query_weights = []
             for token in query_tokens:
-                if token in doc_tokens and token in weight_dict:
-                    weight_sum += weight_dict[token]
-                    token_count += 1
+                weight = weight_dict.get(token, 1.0)  # 默認權重為1.0
+                weighted_query.append(token)
+                query_weights.append(weight)
+                log_file.write(f"Token: {token}, Weight: {weight}\n")
             
-            # 如果文檔包含帶權重的詞，計算加權平均
-            if token_count > 0:
-                avg_weight = weight_sum / token_count
-                weighted_score *= avg_weight
+            # 獲取基礎 BM25 分數
+            base_scores = bm25.get_scores(weighted_query)
+            
+            # 應用權重到文檔評分
+            weighted_scores = []
+            log_file.write("\nDocument Scoring Details:\n")
+            
+            for doc_idx, base_score in enumerate(base_scores):
+                doc_tokens = tokenized_docs[doc_idx]
+                log_file.write(f"\nDocument {doc_idx}:\n")
+                log_file.write(f"Content preview: {' '.join(doc_tokens[:50])}...\n")
                 
-            weighted_scores.append(weighted_score)
+                # 計算文檔的加權分數
+                weighted_score = 0
+                token_matches = []
+                
+                # 對每個查詢詞
+                for q_token, q_weight in zip(weighted_query, query_weights):
+                    # 計算該詞在文檔中的 TF-IDF 得分
+                    term_score = bm25.get_scores([q_token])[doc_idx]
+                    # 應用權重
+                    weighted_term_score = term_score * q_weight
+                    weighted_score += weighted_term_score
+                    
+                    if term_score > 0:
+                        token_matches.append({
+                            'token': q_token,
+                            'weight': q_weight,
+                            'base_score': term_score,
+                            'weighted_score': weighted_term_score
+                        })
+                
+                # 記錄評分細節
+                log_file.write("Term matching details:\n")
+                for match in token_matches:
+                    log_file.write(f"  - Token: {match['token']}\n")
+                    log_file.write(f"    Weight: {match['weight']}\n")
+                    log_file.write(f"    Base score: {match['base_score']:.4f}\n")
+                    log_file.write(f"    Weighted score: {match['weighted_score']:.4f}\n")
+                
+                log_file.write(f"Base score: {base_score:.4f}\n")
+                log_file.write(f"Final weighted score: {weighted_score:.4f}\n")
+                log_file.write("-" * 40 + "\n")
+                
+                weighted_scores.append(weighted_score)
+
+            # 選擇最佳文檔
+            best_idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:n]
+            best_doc = filtered_corpus[best_idx[0]]
             
-            print(f"Debug - Doc {doc_idx} - Base score: {base_score}, Weighted score: {weighted_score}")
+            # 返回對應的文件 ID
+            if category == 'finance':
+                res = [key for key, value in self.corpus_dict_finance.items() if value == best_doc]
+            elif category == 'insurance':
+                res = [key for key, value in self.corpus_dict_insurance.items() if value == best_doc]
+            else:  # faq
+                res = [key for key, value in self.key_to_source_dict.items() if str(value) == best_doc]
+            
+            log_file.write(f"\nSelected document ID: {res[0]}\n")
+            log_file.write(f"Selected document content: {best_doc[:200]}...\n")
+            log_file.write("=" * 50 + "\n\n")
 
-        # 選擇最佳文檔
-        best_idx = sorted(range(len(weighted_scores)), key=lambda i: weighted_scores[i], reverse=True)[:n]
-        
-        # 獲取最佳文檔
-        best_doc = filtered_corpus[best_idx[0]]
-        
-        # 返回對應的文件 ID
-        if category == 'finance':
-            res = [key for key, value in self.corpus_dict_finance.items() if value == best_doc]
-        elif category == 'insurance':
-            res = [key for key, value in self.corpus_dict_insurance.items() if value == best_doc]
-        else:  # faq
-            res = [key for key, value in self.key_to_source_dict.items() if str(value) == best_doc]
-        
-        print(f"Debug - Selected document ID: {res[0]}")
         return res[0]
-
 
     def evaluate_parameters(self, params):
         """Evaluate performance for given parameter set"""
