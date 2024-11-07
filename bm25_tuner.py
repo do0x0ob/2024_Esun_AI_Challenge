@@ -128,6 +128,7 @@ class BM25Tuner:
             print(f"Error loading custom dictionary: {str(e)}")
             print("Continuing with default dictionary...")
     """
+
     def init_jieba(self):
         """初始化 jieba 分詞器"""
         try:
@@ -144,8 +145,8 @@ class BM25Tuner:
             print("Custom dictionary loaded successfully!")
             
             # 測試是否真的載入成功
-            test_text = "契約內容變更應經雙方同意並批註"
-            print("Test segmentation:", list(jieba.cut(test_text)))
+            # test_text = "契約內容變更應經雙方同意並批註"
+            # print("Test segmentation:", list(jieba.cut(test_text)))
             
         except Exception as e:
             print(f"Error loading custom dictionary: {str(e)}")
@@ -156,10 +157,15 @@ class BM25Tuner:
             try:
                 # 構建完整路徑
                 insurance_path = os.path.join(self.dataset_json_path, 'ocr_json', 'ocr_insurance.json')
-                finance_path = os.path.join(self.dataset_json_path, 'ocr_json', 'ocr_finance.json')
+                # TODO: path
+                # finance_path = os.path.join(self.dataset_json_path, 'ocr_json', 'ocr_finance.json')
+                finance_path = os.path.join(self.dataset_json_path, 'google_doc_json', 'dataset.json')
                 faq_path = os.path.join(self.data_dir, 'reference', 'faq', 'pid_map_content.json')
+                # TODO:
                 questions_path = os.path.join(self.data_dir, 'dataset', 'preliminary', 'questions_example.json')
                 ground_truth_path = os.path.join(self.data_dir, 'dataset', 'preliminary', 'ground_truths_example.json')
+                # questions_path = os.path.join(self.data_dir, 'dataset', 'preliminary', 'extra_question.json')
+                # ground_truth_path = os.path.join(self.data_dir, 'dataset', 'preliminary', 'extra_ground_truth.json')
 
                 # 載入資料
                 with open(insurance_path, 'r', encoding='utf-8') as f:
