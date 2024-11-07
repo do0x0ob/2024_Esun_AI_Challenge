@@ -135,13 +135,22 @@ class BM25Tuner:
     
     def expand_query_with_weight(self, query, category, weight_dict=None):
         """ 擴展查詢字串，加入同義詞並賦予權重 """
+
+        print(f"Input query: {query}")
+        print(f"Category: {category}")
+        print(f"Initial synonyms structure: {self.synonyms}")
+        
         if not self.synonyms or category not in self.synonyms:
+            print(f"No synonyms found for category: {category}")
             return query, weight_dict
+
+        #if not self.synonyms or category not in self.synonyms:
+        #    return query, weight_dict  # 確保返回的是字串和字典
 
         words = list(jieba.cut_for_search(query))
         expanded_words = []
         used_synonyms = set()
-        
+
         if weight_dict is None:
             weight_dict = {}
 
@@ -150,14 +159,15 @@ class BM25Tuner:
             found_phrase = False
             for j in range(min(3, len(words) - i), 0, -1):
                 phrase = ''.join(words[i:i+j])
+                # 確保詞語或短語在字典中
                 if phrase in self.synonyms[category]:
+                    print(f"Found phrase: {phrase}")  # 打印找到的短語
                     if phrase not in used_synonyms:
-                        # 從同義詞字典中提取權重，確保是字典結構
                         phrase_data = self.synonyms[category][phrase]
                         weight = phrase_data.get("weight", 1)
                         expanded_words.append(phrase)
                         weight_dict[phrase] = weight  # 使用該權重
-                        
+
                         # 擴展同義詞並給予相同的權重
                         for syn in phrase_data["synonyms"]:
                             if syn not in used_synonyms:
@@ -174,10 +184,11 @@ class BM25Tuner:
                     expanded_words.append(word)
                     # 從同義詞字典中提取權重
                     if word in self.synonyms[category]:
+                        print(f"Found word: {word}")  # 打印找到的詞
                         word_data = self.synonyms[category][word]
                         weight = word_data.get("weight", 1)
                         weight_dict[word] = weight  # 使用該權重
-                    
+
                         # 擴展同義詞並給予相同的權重
                         for syn in word_data["synonyms"]:
                             if syn not in used_synonyms:
@@ -187,6 +198,7 @@ class BM25Tuner:
                     used_synonyms.add(word)
                 i += 1
 
+        print(f"Final weight_dict: {weight_dict}")
         return ' '.join(expanded_words), weight_dict
 
 
@@ -283,7 +295,7 @@ class BM25Tuner:
 
     def BM25_retrieve(self, qs, source, category, k1=1.5, b=0.75, n=1):
         """使用 BM25 算法檢索文檔"""
-        expanded_query = self.expand_query(qs, category)
+        expanded_query = self.expand_query_with_weight(qs, category) # expand_query_with_weight | expand_query
         
         if category == 'finance':
             tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
@@ -296,6 +308,9 @@ class BM25Tuner:
             filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
 
         bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
+        # query_tokens = list(jieba.cut_for_search(expanded_query))
+        # TODO: testing
+        print(f"Expanded query in BM25_retrieve: {expanded_query}")
         query_tokens = list(jieba.cut_for_search(expanded_query))
         doc_scores = bm25.get_scores(query_tokens)
         best_idx = sorted(range(len(doc_scores)), key=lambda i: doc_scores[i], reverse=True)[:n]
@@ -316,6 +331,10 @@ class BM25Tuner:
     def BM25_retrieve_with_weight(self, qs, source, category, k1=1.5, b=0.75, n=1):
         """使用加權 BM25 算法檢索文檔"""
         expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
+
+        # FIXME: test only
+        # print(f"Expanded query after expand_query_with_weight: {expanded_query}")
+        # print(f"Weight dict: {weight_dict}")
         
         if category == 'finance':
             tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
@@ -363,7 +382,7 @@ class BM25Tuner:
         answer_dict = {"answers": []}
         
         for q_dict in self.questions['questions']:
-            retrieved = self.BM25_retrieve(
+            retrieved = self.BM25_retrieve_with_weight( # BM25_retrieve_with_weight | BM25_retrieve
                 q_dict['query'], 
                 q_dict['source'], 
                 q_dict['category'],
