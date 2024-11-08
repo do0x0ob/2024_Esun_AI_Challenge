@@ -5,7 +5,7 @@
                 "保單內容",
                 "合約內容"
             ],
-            "weight": 5
+            "weight": 1
         },
         "契約": {
             "synonyms": [
@@ -45,12 +45,6 @@
         "被保險人": {
             "synonyms": [
                 "受保人"
-            ],
-            "weight": 1
-        },
-        "受益人": {
-            "synonyms": [
-                "保險金受益人"
             ],
             "weight": 1
         },
@@ -153,7 +147,7 @@
             "synonyms": [
                 "補換發"
             ],
-            "weight": 1
+            "weight": 2
         },
         "貸款額度": {
             "synonyms": [
@@ -170,7 +164,20 @@
         },
         "刷臉ID": {
             "synonyms": ["刷臉id"],
-            "weight": 10
+            "weight": 5
+        },
+        "受益人": {
+            "synonyms": ["受益人"],
+            "weight": 5
+        },
+        "被保險人": {
+            "synonyms": ["被保險人"],
+            "weight": 5
+        },
+        "應": {
+            "synonyms": ["應該"],
+            "weight": 2
         }
+
     }
 }

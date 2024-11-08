@@ -1,4 +1,5 @@
 import os
+import math
 import datetime
 import json
 import argparse
@@ -89,21 +90,24 @@ class BM25Tuner:
             print(f"Error loading stopwords: {str(e)}")
 
     def remove_stopwords(self, tokens):
-        """移除停用詞"""
+        """移除停用詞，但保留同義詞中的重要詞"""
         if not self.use_stopwords:
             return tokens
         
-        # original_length = len(tokens)
-        filtered_tokens = [token for token in tokens if token not in self.stopwords]
-        # removed_tokens = [token for token in tokens if token in self.stopwords]
+        #TODO: 去除空格
+        tokens = [token for token in tokens if token.strip()]
         
-        # TODO: debug print only
-        """
-        if removed_tokens:  # 只有在實際移除了停用詞時才打印
-            print(f"Stopwords removal - Before: {original_length} tokens, After: {len(filtered_tokens)} tokens")
-            print(f"Removed tokens: {removed_tokens}")
-        """
-            
+        # 獲取所有同義詞
+        all_synonyms = set()
+        for category in self.synonyms:
+            for word in self.synonyms[category]:
+                all_synonyms.add(word)
+                all_synonyms.update(self.synonyms[category][word].get("synonyms", []))
+        
+        # 過濾停用詞，但保留同義詞
+        filtered_tokens = [token for token in tokens 
+                        if token not in self.stopwords or token in all_synonyms]
+        
         return filtered_tokens
 
     def read_synonyms_from_file(self, file_path):
@@ -152,10 +156,15 @@ class BM25Tuner:
     
     def expand_query_with_weight(self, query, category):
         """擴展查詢字串，加入同義詞並賦予權重"""
+        # print(f"\nDebug - Original query: {query}")
+         #print(f"Category: {category}")
+        
         if not self.synonyms or category not in self.synonyms:
+            print("No synonyms found for this category")
             return query, {}
 
         words = list(jieba.cut_for_search(query))
+        # print(f"Tokenized query: {words}")
         expanded_words = []
         weight_dict = {}
         used_synonyms = set()
@@ -211,6 +220,8 @@ class BM25Tuner:
                 i += 1
 
         expanded_query = ' '.join(expanded_words)
+        # print(f"Expanded query: {expanded_query}")
+        # print(f"Weight dict: {weight_dict}")
         return expanded_query, weight_dict
 
     def init_jieba(self):
@@ -309,7 +320,7 @@ class BM25Tuner:
 
     def BM25_retrieve(self, qs, source, category, k1=1.5, b=0.75, n=1):
         """使用 BM25 算法檢索文檔"""
-        expanded_query = self.expand_query_with_weight(qs, category) # expand_query_with_weight | expand_query
+        expanded_query, weight_dict = self.expand_query_with_weight(qs, category)
         
         if category == 'finance':
             tokenized_docs = [self.tokenized_corpus['finance'][int(file)] for file in source]
@@ -322,17 +333,22 @@ class BM25Tuner:
             filtered_corpus = [str(self.key_to_source_dict[int(file)]) for file in source]
 
         bm25 = BM25Okapi(tokenized_docs, k1=k1, b=b)
-        # query_tokens = list(jieba.cut_for_search(expanded_query))
-        # TODO: testing
-        print(f"Expanded query in BM25_retrieve: {expanded_query}")
         query_tokens = list(jieba.cut_for_search(expanded_query))
-        doc_scores = bm25.get_scores(query_tokens)
-        best_idx = sorted(range(len(doc_scores)), key=lambda i: doc_scores[i], reverse=True)[:n]
         
-        # Match with original text
+        # 應用權重到 BM25 分數
+        doc_scores = bm25.get_scores(query_tokens)
+        
+        # 調整分數以考慮同義詞權重
+        if weight_dict:
+            for i, score in enumerate(doc_scores):
+                weight_sum = sum(weight_dict.get(token, 1.0) for token in query_tokens 
+                            if token in ' '.join(tokenized_docs[i]))
+                doc_scores[i] = score * weight_sum
+        
+        best_idx = sorted(range(len(doc_scores)), key=lambda i: doc_scores[i], reverse=True)[:n]
         best_doc = filtered_corpus[best_idx[0]]
         
-        # Return corresponding file ID
+        # 返回對應的文件 ID
         if category == 'finance':
             res = [key for key, value in self.corpus_dict_finance.items() if value == best_doc]
         elif category == 'insurance':
@@ -400,14 +416,29 @@ class BM25Tuner:
                 log_file.write(f"\nDocument {doc_idx}:\n")
                 log_file.write(f"Content preview: {' '.join(doc_tokens[:50])}...\n")
                 
-                # 計算文檔的加權分數
                 weighted_score = 0
                 token_matches = []
                 
-                # 對每個查詢詞
+                # 計算每個查詢詞的加權分數
                 for q_token, q_weight in zip(weighted_query, query_weights):
-                    # 計算該詞在文檔中的 TF-IDF 得分
-                    term_score = bm25.get_scores([q_token])[doc_idx]
+                    # 計算當前token在文檔中的頻率(tf)
+                    tf = sum(1 for token in doc_tokens if token == q_token)
+                    
+                    # 計算文檔頻率(df)
+                    df = sum(1 for doc in tokenized_docs if q_token in doc)
+                    
+                    # 計算 IDF
+                    N = len(tokenized_docs)
+                    idf = math.log((N - df + 0.5) / (df + 0.5) + 1.0)
+                    
+                    # 計算文檔長度標準化因子
+                    doc_len = len(doc_tokens)
+                    avg_doc_len = sum(len(doc) for doc in tokenized_docs) / len(tokenized_docs)
+                    norm_factor = 1 - b + b * (doc_len / avg_doc_len)
+                    
+                    # 計算該詞的 BM25 分數
+                    term_score = (tf * (k1 + 1)) / (tf + k1 * norm_factor) * idf
+                    
                     # 應用權重
                     weighted_term_score = term_score * q_weight
                     weighted_score += weighted_term_score
@@ -416,6 +447,8 @@ class BM25Tuner:
                         token_matches.append({
                             'token': q_token,
                             'weight': q_weight,
+                            'tf': tf,
+                            'idf': idf,
                             'base_score': term_score,
                             'weighted_score': weighted_term_score
                         })
@@ -425,6 +458,8 @@ class BM25Tuner:
                 for match in token_matches:
                     log_file.write(f"  - Token: {match['token']}\n")
                     log_file.write(f"    Weight: {match['weight']}\n")
+                    log_file.write(f"    TF: {match['tf']}\n")
+                    log_file.write(f"    IDF: {match['idf']:.4f}\n")
                     log_file.write(f"    Base score: {match['base_score']:.4f}\n")
                     log_file.write(f"    Weighted score: {match['weighted_score']:.4f}\n")
                 
