@@ -32,8 +32,11 @@
     --data_dir path/to/data \
     --config config.json \
     --dataset_json_path path/to/ocr_json \
-    --use_custom_dict
-    --use_synonyms
+    --use_custom_dict \
+    --use_synonyms \
+    --synonyms_dir synonyms \
+    --use_stopwrds \
+    --stopwords_path path/to/stopword.txt
     ```
 
 2. **Run bm25_retrieve**  

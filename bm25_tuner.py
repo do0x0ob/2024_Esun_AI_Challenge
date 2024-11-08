@@ -8,14 +8,21 @@ from rank_bm25 import BM25Okapi
 import itertools
 
 class BM25Tuner:
-    def __init__(self, data_dir, dataset_json_path, use_custom_dict=False, use_synonyms=False, synonyms_dir=None):
+    def __init__(self, data_dir, dataset_json_path, use_custom_dict=False, use_synonyms=False, synonyms_dir=None, use_stopwords=False, stopwords_path=None):
         self.data_dir = data_dir
         self.dataset_json_path = dataset_json_path
         self.output_path = os.path.join(os.getcwd(), 'output_answers.json')
         self.best_params = None
         self.best_accuracy = 0
         self.results = []
-        
+
+        # 停用詞相關設定
+        self.use_stopwords = use_stopwords
+        self.stopwords_path = stopwords_path
+        self.stopwords = set()
+        if use_stopwords:
+            self.load_stopwords()
+
         # 同義詞相關設定
         self.use_synonyms = use_synonyms
         self.synonyms_dir = synonyms_dir
@@ -30,6 +37,74 @@ class BM25Tuner:
         print("Loading all data...")
         self.load_json_data()
         print("Data loading completed!")
+
+    #TODO: testing
+    def test_stopwords(self, test_text="在這裡測試停用詞的效果"):
+        """測試停用詞效果"""
+        print("\n=== Stopwords Test ===")
+        print(f"Test text: {test_text}")
+        print(f"Stopwords enabled: {self.use_stopwords}")
+        print(f"Stopwords path: {self.stopwords_path}")
+        print(f"Total stopwords loaded: {len(self.stopwords)}")
+        print(f"Current stopwords: {list(self.stopwords)[:10]}")  # 顯示前10個停用詞
+        
+        # 測試分詞
+        tokens = list(jieba.cut_for_search(test_text))
+        print(f"Original tokens: {tokens}")
+        
+        # 測試停用詞移除
+        filtered_tokens = self.remove_stopwords(tokens)
+        print(f"Tokens after stopwords removal: {filtered_tokens}")
+        
+        # 顯示被移除的詞
+        removed = [t for t in tokens if t not in filtered_tokens]
+        print(f"Removed tokens: {removed}")
+        
+        # 顯示每個詞是否在停用詞中
+        print("\nToken analysis:")
+        for token in tokens:
+            print(f"Token '{token}' is{' ' if token in self.stopwords else ' not '}in stopwords")
+
+    def load_stopwords(self):
+        """載入停用詞"""
+        self.stopwords = set()  # 確保初始化為空集合
+        
+        if not self.stopwords_path:
+            print("No stopwords path specified")
+            return
+        
+        try:
+            with open(self.stopwords_path, 'r', encoding='utf-8') as f:
+                # 直接讀取所有非空行
+                self.stopwords = {line.strip() for line in f if line.strip()}
+                
+            print(f"Stopwords enabled: {bool(self.stopwords)}")
+            print(f"Stopwords path: {self.stopwords_path}")
+            print(f"Total stopwords loaded: {len(self.stopwords)}")
+            print(f"Current stopwords: {list(self.stopwords)[:10]}")  # 只顯示前10個作為預覽
+            
+        except FileNotFoundError:
+            print(f"Error: Stopwords file not found at {self.stopwords_path}")
+        except Exception as e:
+            print(f"Error loading stopwords: {str(e)}")
+
+    def remove_stopwords(self, tokens):
+        """移除停用詞"""
+        if not self.use_stopwords:
+            return tokens
+        
+        # original_length = len(tokens)
+        filtered_tokens = [token for token in tokens if token not in self.stopwords]
+        # removed_tokens = [token for token in tokens if token in self.stopwords]
+        
+        # TODO: debug print only
+        """
+        if removed_tokens:  # 只有在實際移除了停用詞時才打印
+            print(f"Stopwords removal - Before: {original_length} tokens, After: {len(filtered_tokens)} tokens")
+            print(f"Removed tokens: {removed_tokens}")
+        """
+            
+        return filtered_tokens
 
     def read_synonyms_from_file(self, file_path):
         """讀取同義詞字典文件"""
@@ -211,13 +286,16 @@ class BM25Tuner:
         }
         
         for doc_id, content in self.corpus_dict_insurance.items():
-            self.tokenized_corpus['insurance'][doc_id] = list(jieba.cut_for_search(content))
+            tokens = list(jieba.cut_for_search(content))
+            self.tokenized_corpus['insurance'][doc_id] = self.remove_stopwords(tokens)
         
         for doc_id, content in self.corpus_dict_finance.items():
-            self.tokenized_corpus['finance'][doc_id] = list(jieba.cut_for_search(content))
+            tokens = list(jieba.cut_for_search(content))
+            self.tokenized_corpus['finance'][doc_id] = self.remove_stopwords(tokens)
             
         for doc_id, content in self.key_to_source_dict.items():
-            self.tokenized_corpus['faq'][doc_id] = list(jieba.cut_for_search(str(content)))
+            tokens = list(jieba.cut_for_search(str(content)))
+            self.tokenized_corpus['faq'][doc_id] = self.remove_stopwords(tokens)
 
 
     def check_file_exists(self, file_path, description):
@@ -295,10 +373,11 @@ class BM25Tuner:
             
             # 對查詢進行分詞並應用權重
             query_tokens = list(jieba.cut_for_search(expanded_query))
+            query_tokens = self.remove_stopwords(query_tokens)
             
             # 記錄查詢詞和權重
             log_file.write("Query Analysis:\n")
-            log_file.write(f"Query tokens: {query_tokens}\n")
+            log_file.write(f"Query tokens (after stopwords removal): {query_tokens}\n")
             
             # 創建加權查詢向量
             weighted_query = []
@@ -530,6 +609,12 @@ def main():
     parser.add_argument("--synonyms_dir", 
                        default="synonyms",
                        help="Path to synonyms directory")
+    parser.add_argument("--use_stopwords",
+                       action="store_true",
+                       help="Whether to use stopwords")
+    parser.add_argument("--stopwords_path",
+                       default="stopwords.txt",
+                       help="Path to stopwords file")
     args = parser.parse_args()
 
     # Load configuration
@@ -570,8 +655,22 @@ def main():
             dataset_json_path=args.dataset_json_path,
             use_custom_dict=args.use_custom_dict,
             use_synonyms=args.use_synonyms,
-            synonyms_dir=args.synonyms_dir if args.use_synonyms else None
+            synonyms_dir=args.synonyms_dir if args.use_synonyms else None,
+            use_stopwords=args.use_stopwords,
+            stopwords_path=args.stopwords_path if args.use_stopwords else None
         )
+
+        # TODO: test only 添加停用詞測試
+        """
+        test_texts = [
+            "在這裡測試停用詞",
+            "我在想知道保險的內容",
+            "這是一個、測試，在哪裡？",
+        ]
+
+        for text in test_texts:
+            tuner.test_stopwords(text)
+        """
         
         # Run grid search
         print("\nStarting parameter tuning...")

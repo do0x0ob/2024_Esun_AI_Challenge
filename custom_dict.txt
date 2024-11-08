@@ -25,6 +25,7 @@ Android System WebView 5
 轉帳功能 5
 人臉辨識 5
 刷臉ID 20
+刷臉id 20
 
 # 錯題
 要保人 20
