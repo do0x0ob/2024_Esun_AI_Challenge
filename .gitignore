@@ -1,6 +1,7 @@
 # venv
 venv/
 env/
+myenv/
 .venv/
 .env/
 
@@ -12,7 +13,19 @@ __pycache__/
 
 # output_answers.json
 output_answers.json
+parameter_search_results.json
+error_analysis.json
 
 # Others
 .DS_Store
 *.log
+
+# jupyter notebook
+*.ipynb
+.ipynb_checkpoints/
+data_converter.py
+
+# data folder
+/question_data/
+utils/finance_split_38-74/
+utils/insurance_split_14-26/
