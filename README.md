@@ -14,7 +14,10 @@ Best parameters found: {'k1': 0.8, 'b': 0.45, 'n': 1}
 
 ## How to Use
 
-**Run bm25_tuner in terminal**
+**1. Install requirements**  
+`pip install -r requirements.txt`
+
+**2. Run bm25_tuner in terminal**
 
 ```shell
 python bm25_tuner.py \
